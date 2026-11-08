@@ -11,11 +11,13 @@ Autonomous agents need to buy things: data, compute, answers. Cards can't do it.
 An AI agent asks a paid AI API a question. The API replies HTTP 402 with a Solana Pay quote (recipient, 0.001 USDC-like token, unique reference). The agent checks its budget, pays on-chain in about a second for a fraction of a cent, retries with the reference, and gets a Claude answer. A dashboard shows the live payment feed with explorer links, spend vs budget, and confirm latency. "Burst x10" fires ten paid requests for one cent. Lower the cap and the agent refuses to overspend.
 
 ## How we built it
-Next.js 15 app. `/api/ask` is the paid endpoint: it issues quotes, verifies payment with `@solana/pay` (`findReference` + `validateTransfer`), enforces one-payment-one-answer so a reference can't be replayed, then calls Claude (`claude-haiku-5-5`) via the Anthropic SDK. `/api/agent` is the autonomous client: budget check, SPL transfer via `@solana/web3.js` and `@solana/spl-token`, retry. A setup script generates devnet keypairs, airdrops SOL, mints a test USDC and writes `.env.local`. Without an Anthropic key the API returns mock answers so the demo always runs.
+Next.js 15 app. `/api/ask` is the paid endpoint: it issues quotes, verifies payment with `@solana/pay` (`findReference` + `validateTransfer`), enforces one-payment-one-answer so a reference can't be replayed, then calls Claude (`claude-haiku-5-5`) via the Anthropic SDK. `/api/agent` is the autonomous client: budget check, SPL transfer via `@solana/web3.js` and `@solana/spl-token`, retry. The agent signs each payment once and resends the same bytes on RPC errors, so a retry can never pay twice. A setup script generates devnet keypairs, funds them (airdrop, or the devnet faucet when airdrops are closed), mints a test USDC and writes `.env.local`. Without an Anthropic key the API returns mock answers so the demo always runs. An optional password puts the dashboard and the agent's spend controls behind Basic auth, while the paid API stays open: payment is its auth.
 
 ## Challenges we ran into
 - Making payment verification airtight: matching amount, recipient and mint, and blocking replay of a reference.
 - Handling confirmation timing so the retry doesn't race the chain.
+- Surviving a flaky, rate-limited public devnet RPC without ever double-paying: re-signing on retry would create a second transaction, so the agent resends the exact signed bytes and the network dedupes them.
+- Not losing a payment when the AI call fails: the quote is restored so the same payment can be retried.
 - Keeping the cap strict: the agent must refuse before sending anything, not after.
 - Building a one-command devnet setup so judges can run it in minutes.
 
