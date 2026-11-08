@@ -23,7 +23,8 @@ export async function PUT(req: Request) {
 
 export async function POST(req: Request) {
   const { prompt } = await req.json().catch(() => ({}));
-  const askUrl = new URL("/api/ask", req.url);
+  // Call our own API directly. Behind a TLS-terminating proxy (Render) req.url says https but the app speaks plain http.
+  const askUrl = new URL("/api/ask", process.env.PORT ? `http://127.0.0.1:${process.env.PORT}` : req.url);
   const post = (body: object) => fetch(askUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
   // 1. Ask without paying -> expect a 402 quote.
