@@ -1,0 +1,22 @@
+# Render Blueprint: one always-on web service (state is in memory, so it must be a single instance, not serverless).
+# Only AGENT_SECRET_KEY is secret; Render asks for it when you create the Blueprint. The rest are public on-chain addresses.
+services:
+  - type: web
+    name: payperprompt
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: AGENT_SECRET_KEY
+        sync: false
+      - key: MERCHANT_PUBKEY
+        value: CByWGmrQPECkHkqK8KHMC14sr1TquWNU2LgrSrawFFqP
+      - key: USDC_MINT
+        value: AjjMwiRjM9hbDchmRLLtUHz7aj67ftXN2GT97EnmM9CM
+      - key: PRICE_USDC
+        value: "0.001"
+      - key: AGENT_BUDGET_USDC
+        value: "0.02"
