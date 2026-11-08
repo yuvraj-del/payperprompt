@@ -59,7 +59,8 @@ export async function POST(req: Request) {
   state.payments.unshift({ signature, amount: quote.amount, prompt, ms, at: Date.now() });
 
   // 4. Retry with proof of payment.
-  const res = await post({ prompt, reference: quote.reference, signature });
+  let res = await post({ prompt, reference: quote.reference, signature });
+  if (res.status === 502) res = await post({ prompt, reference: quote.reference, signature }); // answer failed but payment is still valid: retry once
   const body = await res.json();
   if (!res.ok) return NextResponse.json({ error: body.error ?? "paid but no answer" }, { status: 500 });
   return NextResponse.json({ answer: body.answer, signature, explorer: explorerTx(signature), amount: quote.amount, spent: state.spent, budget: state.budget, ms });

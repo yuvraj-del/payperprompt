@@ -2,7 +2,7 @@
 export type Payment = { signature: string; amount: string; prompt: string; ms: number; at: number };
 
 type State = {
-  pending: Map<string, string>; // reference pubkey -> prompt it was quoted for
+  pending: Map<string, { prompt: string; at: number }>; // reference pubkey -> prompt it was quoted for; insertion order = age
   usedSignatures: Set<string>; // replay protection: each payment buys exactly one answer
   spent: number; // agent's total USDC spent
   budget: number; // agent's spending cap in USDC

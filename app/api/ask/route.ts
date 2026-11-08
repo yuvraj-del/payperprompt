@@ -8,7 +8,8 @@ import { state } from "@/lib/state";
 
 export const runtime = "nodejs";
 
-const bad = (status: number, error: string) => NextResponse.json({ error }, { status });
+const QUOTE_TTL_MS = 10 * 60_000; // unpaid quotes expire after 10 minutes
+const bad =(status: number, error: string) => NextResponse.json({ error }, { status });
 
 export async function POST(req: Request) {
   const { prompt, reference, signature } = await req.json().catch(() => ({}));
@@ -16,8 +17,15 @@ export async function POST(req: Request) {
 
   // Step 1: quote. A fresh reference key ties the on-chain payment to this exact request.
   if (!reference) {
+    const now = Date.now();
+    // Drop expired unpaid quotes, oldest first, so they can't pile up in memory.
+    // ponytail: TTL only; a flood within one TTL still grows the map, add a size cap or rate limit if exposed publicly.
+    for (const [k, q] of state.pending) {
+      if (now - q.at < QUOTE_TTL_MS) break;
+      state.pending.delete(k);
+    }
     const ref = Keypair.generate().publicKey.toBase58();
-    state.pending.set(ref, prompt);
+    state.pending.set(ref, { prompt, at: now });
     return NextResponse.json(
       { recipient: merchantPubkey().toBase58(), amount: PRICE.toString(), splToken: usdcMint().toBase58(), reference: ref, label: "PayPerPrompt" },
       { status: 402 },
@@ -25,7 +33,7 @@ export async function POST(req: Request) {
   }
 
   // Step 2: verify payment. Quote must exist and match the prompt it was issued for.
-  if (state.pending.get(reference) !== prompt) return bad(402, "unknown or already-used quote");
+  if (state.pending.get(reference)?.prompt !== prompt) return bad(402, "unknown or already-used quote");
   let sig: string = signature;
   try {
     const refKey = new PublicKey(reference);
@@ -39,7 +47,14 @@ export async function POST(req: Request) {
   state.usedSignatures.add(sig);
   state.pending.delete(reference);
 
-  return NextResponse.json({ answer: await answer(prompt), signature: sig });
+  try {
+    return NextResponse.json({ answer: await answer(prompt), signature: sig });
+  } catch (e) {
+    // The answer failed after payment: un-spend it so the same reference + signature can be retried.
+    state.usedSignatures.delete(sig);
+    state.pending.set(reference, { prompt, at: Date.now() });
+    return bad(502, `paid, but the answer failed (retry with the same reference): ${(e as Error).message}`);
+  }
 }
 
 async function answer(prompt: string): Promise<string> {

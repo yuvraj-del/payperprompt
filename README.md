@@ -49,6 +49,7 @@ npm run setup     # generates devnet keypairs + writes .env.local; prints the ag
 # devnet RPC airdrops are closed: fund the agent pubkey at https://faucet.solana.com, then:
 npm run setup     # creates the test USDC mint, token accounts, mints 100 to the agent
 # optional: add ANTHROPIC_API_KEY=... to .env.local (without it, answers are mocked)
+# optional: add DASHBOARD_PASSWORD=... to put the dashboard and agent controls behind Basic auth (set it if others can reach the app)
 npm run dev       # http://localhost:3000
 ```
 
