@@ -14,7 +14,20 @@ function env(name: string): string {
   return v;
 }
 
-export const connection = new Connection(process.env.RPC_URL ?? clusterApiUrl("devnet"), "confirmed");
+// The public devnet RPC drops connections now and then ("fetch failed"). Retry network errors only.
+// Safe for sendTransaction too: re-sending the same signed tx has the same signature, so it can't pay twice.
+const retryingFetch: typeof fetch = async (input, init) => {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetch(input, init);
+    } catch (e) {
+      if (attempt >= 2) throw e;
+      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+    }
+  }
+};
+
+export const connection = new Connection(process.env.RPC_URL ?? clusterApiUrl("devnet"), { commitment: "confirmed", fetch: retryingFetch });
 
 // Secret keys are stored as JSON byte arrays (same format as solana-keygen output).
 export const agentKeypair = () => Keypair.fromSecretKey(Uint8Array.from(JSON.parse(env("AGENT_SECRET_KEY"))));
