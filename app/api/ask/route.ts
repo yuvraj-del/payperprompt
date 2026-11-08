@@ -61,7 +61,7 @@ async function answer(prompt: string): Promise<string> {
   if (!process.env.ANTHROPIC_API_KEY) return `(mock answer - set ANTHROPIC_API_KEY for real AI) You asked: "${prompt}"`;
   const msg = await new Anthropic().messages.create({
     model: "claude-haiku-5-5",
-    max_tokens: 400,
+    max_tokens: 1024, // Haiku 5.5 thinks by default and thinking counts toward this; 400 could cut answers short
     system: "Answer concisely in under 120 words.",
     messages: [{ role: "user", content: prompt }],
   });
