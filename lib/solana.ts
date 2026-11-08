@@ -1,5 +1,12 @@
 import { Connection, Keypair, PublicKey, clusterApiUrl } from "@solana/web3.js";
 import BigNumber from "bignumber.js";
+import tls from "node:tls";
+
+// Antivirus HTTPS scanning (e.g. Norton Web Shield) re-signs certificates with a root only the OS trusts, and Node
+// ignores the OS store, so every RPC call fails with UNABLE_TO_VERIFY_LEAF_SIGNATURE. Trust the OS store as well.
+// Needs Node >= 22.19 / 24.5; older Node skips this and behaves as before.
+const t = tls as typeof tls & { getCACertificates?: (s: string) => string[]; setDefaultCACertificates?: (c: string[]) => void };
+if (t.getCACertificates && t.setDefaultCACertificates) t.setDefaultCACertificates([...t.getCACertificates("default"), ...t.getCACertificates("system")]);
 
 function env(name: string): string {
   const v = process.env[name];
