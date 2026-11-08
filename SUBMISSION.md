@@ -6,6 +6,8 @@
 
 **Demo video:** https://youtu.be/_Q8L6GngaW4
 
+**Live demo:** https://payperprompt.onrender.com (Solana devnet)
+
 ## Inspiration
 Autonomous agents need to buy things: data, compute, answers. Cards can't do it. A $0.001 API call costs ~$0.30 in card fees, 300x the price, and every agent would need an account and a human-issued key. We wanted an agent that holds its own wallet, has a spending limit, and pays per request.
 

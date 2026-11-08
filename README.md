@@ -3,6 +3,8 @@
 An AI agent with its own Solana wallet and a hard spending cap pays for every AI answer it gets, per request, on-chain.
 The API says HTTP 402, the agent pays 0.001 USDC in about a second, and the answer comes back. No API keys, no subscriptions, no card.
 
+**Live demo:** [payperprompt.onrender.com](https://payperprompt.onrender.com) (Solana devnet; free hosting, so the first visit can take about a minute to wake up, and a restart clears the feed)
+
 **Demo video (1:38):** [youtu.be/_Q8L6GngaW4](https://youtu.be/_Q8L6GngaW4)
 
 [![PayPerPrompt demo video](https://img.youtube.com/vi/_Q8L6GngaW4/hqdefault.jpg)](https://youtu.be/_Q8L6GngaW4)
