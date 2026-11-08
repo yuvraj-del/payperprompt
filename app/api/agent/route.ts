@@ -1,9 +1,9 @@
 // The AI agent: asks the paid API, checks the quote against its budget and trusted payee, pays on-chain, retries.
 import { NextResponse } from "next/server";
-import { PublicKey, sendAndConfirmTransaction } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import { createTransfer } from "@solana/pay";
 import BigNumber from "bignumber.js";
-import { connection, agentKeypair, merchantPubkey, usdcMint, explorerTx } from "@/lib/solana";
+import { connection, agentKeypair, merchantPubkey, usdcMint, explorerTx, retry } from "@/lib/solana";
 import { state } from "@/lib/state";
 
 export const runtime = "nodejs";
@@ -44,13 +44,22 @@ export async function POST(req: Request) {
   let signature: string;
   try {
     const agent = agentKeypair();
-    const tx = await createTransfer(connection, agent.publicKey, {
-      recipient: new PublicKey(quote.recipient),
-      amount: new BigNumber(quote.amount),
-      splToken: new PublicKey(quote.splToken),
-      reference: new PublicKey(quote.reference),
-    });
-    signature = await sendAndConfirmTransaction(connection, tx, [agent], { commitment: "confirmed" });
+    const tx = await retry(() =>
+      createTransfer(connection, agent.publicKey, {
+        recipient: new PublicKey(quote.recipient),
+        amount: new BigNumber(quote.amount),
+        splToken: new PublicKey(quote.splToken),
+        reference: new PublicKey(quote.reference),
+      }),
+    );
+    const bh = await retry(() => connection.getLatestBlockhash("confirmed"));
+    tx.recentBlockhash = bh.blockhash;
+    tx.sign(agent);
+    // Sign once, resend the same bytes: same signature, so the network dedupes and a retry can never pay twice.
+    const raw = tx.serialize();
+    signature = await retry(() => connection.sendRawTransaction(raw));
+    const conf = await retry(() => connection.confirmTransaction({ signature, ...bh }, "confirmed"));
+    if (conf.value.err) throw new Error(`transaction failed: ${JSON.stringify(conf.value.err)}`);
   } catch (e) {
     state.spent -= amount; // ponytail: refunds the reservation even if a timed-out tx actually landed; fine for devnet
     return NextResponse.json({ error: `payment failed: ${(e as Error).message}` }, { status: 500 });
@@ -59,8 +68,12 @@ export async function POST(req: Request) {
   state.payments.unshift({ signature, amount: quote.amount, prompt, ms, at: Date.now() });
 
   // 4. Retry with proof of payment.
+  // Retry when verification flakes on the RPC (402, quote untouched) or the answer fails (502, quote restored); the payment stays valid.
   let res = await post({ prompt, reference: quote.reference, signature });
-  if (res.status === 502) res = await post({ prompt, reference: quote.reference, signature }); // answer failed but payment is still valid: retry once
+  for (let i = 1; i < 3 && (res.status === 402 || res.status === 502); i++) {
+    await new Promise((r) => setTimeout(r, 500 * i));
+    res = await post({ prompt, reference: quote.reference, signature });
+  }
   const body = await res.json();
   if (!res.ok) return NextResponse.json({ error: body.error ?? "paid but no answer" }, { status: 500 });
   return NextResponse.json({ answer: body.answer, signature, explorer: explorerTx(signature), amount: quote.amount, spent: state.spent, budget: state.budget, ms });

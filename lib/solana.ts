@@ -16,4 +16,17 @@ export const usdcMint = () => new PublicKey(env("USDC_MINT"));
 
 export const PRICE = new BigNumber(process.env.PRICE_USDC ?? "0.001"); // USDC per request
 export const USDC_DECIMALS = 6;
-export const explorerTx = (sig: string) => `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
+
+// Public devnet RPC drops requests under load ("fetch failed"). Retry with backoff; only wrap calls that are safe to repeat.
+export async function retry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i >= tries) throw e;
+      await new Promise((r) => setTimeout(r, 400 * i));
+    }
+  }
+}
+
+export const explorerTx =(sig: string) => `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
