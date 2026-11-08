@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Payment = { signature: string; amount: string; prompt: string; ms: number; at: string | number };
 type State = { spent: number; budget: number; agent: string; payments: Payment[] };
@@ -25,6 +25,12 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [cap, setCap] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const chatRef = useRef<HTMLDivElement>(null);
+
+  // Keep the newest message (an answer, a refusal) in view.
+  useEffect(() => {
+    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
+  }, [msgs, busy]);
 
   const refresh = useCallback(async () => {
     try {
@@ -178,7 +184,7 @@ export default function Home() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <section aria-label="Chat" className="rounded-xl border border-zinc-200 dark:border-zinc-800 flex flex-col min-h-[28rem]">
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[60vh]" aria-live="polite">
+          <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[60vh]" aria-live="polite">
             {msgs.length === 0 && <p className="text-sm text-zinc-500">Ask the agent anything. Each answer is paid for on-chain.</p>}
             {msgs.map((m, i) =>
               m.kind === "user" ? (
